@@ -5,44 +5,68 @@ import { v2 as cloudinary } from 'cloudinary';
 
 export async function POST(request: NextRequest) {
     try {
-        await connectDB();
+      await connectDB();
 
-        const formData = await request.formData();
+      const formData = await request.formData();
 
-        let event;
+      let event;
 
-        try {
-            event = Object.fromEntries(formData.entries());
-        } catch (e) {
-            return NextResponse.json({ message: 'Invalid JSON data format' }, { status: 400 })
-        }
+      try {
+        event = Object.fromEntries(formData.entries());
+      } catch (e) {
+        return NextResponse.json(
+          {
+            message: "Invalid JSON data format",
+            error: e instanceof Error ? e.message : "Unknown",
+          },
+          { status: 400 },
+        );
+      }
 
-        const file = formData.get('image') as File;
+      const file = formData.get("image") as File;
 
-        if (!File) {
-            return NextResponse.json({ message: 'Image is not returned' }, { status: 400 })
-        }
+      if (!File) {
+        return NextResponse.json(
+          { message: "Image is not returned" },
+          { status: 400 },
+        );
+      }
 
-        const arrayBuffer = await file.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
+      const tags = JSON.parse(formData.get("tags") as string)
+      const agenda = JSON.parse(formData.get("agenda") as string)
 
-        const uploadResult = await new Promise((resolve, reject) => {
-            cloudinary.uploader.upload_stream({ resource_type: 'image', folder: 'Devevent' }, (error, result) => {
-                if (error) return reject(error);
+      const arrayBuffer = await file.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
 
-                resolve(result);
-            }).end(buffer)
-        });
+      const uploadResult = await new Promise((resolve, reject) => {
+        cloudinary.uploader
+          .upload_stream(
+            { resource_type: "image", folder: "Devevent" },
+            (error, result) => {
+              if (error) return reject(error);
 
-        event.image = (uploadResult as { secure_url: string }).secure_url;
+              resolve(result);
+            },
+          )
+          .end(buffer);
+      });
 
-        const createdEvent = await Event.create(event);
+      event.image = (uploadResult as { secure_url: string }).secure_url;
 
-        return NextResponse.json({ message: 'Event created successfully', event: createdEvent }, { status: 201 })
+      const createdEvent = await Event.create({...event,agenda: agenda, tags:tags});
 
+      return NextResponse.json(
+        { message: "Event created successfully", event: createdEvent },
+        { status: 201 },
+      );
     } catch (e) {
-        console.log(e);
-        return NextResponse.json({ message: "Event creation failed", error: e instanceof Error ? e.message : 'Unknown' }, { status: 400 })
+      return NextResponse.json(
+        {
+          message: "Event creation failed",
+          error: e instanceof Error ? e.message : "Unknown",
+        },
+        { status: 400 },
+      );
     }
 }
 
